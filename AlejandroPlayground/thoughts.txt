@@ -1,0 +1,4 @@
+- Si queremos usar la rule para las demostraciones del certificado quiza sea mejor mul y or
+n-arias para razonar por induccion en la longitud de la lista directamente.
+- que aporta usar la rule vs desenvoltorio y mathlib con simpa
+- 

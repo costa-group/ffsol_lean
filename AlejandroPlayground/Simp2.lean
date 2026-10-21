@@ -111,7 +111,9 @@ theorem ejercicillo2 {p : Nat} [Fact (Nat.Prime p)]
     · right; left; exact hb
     · rcases reqToDisy ρ _ _ hcd with hc | hd
       · right; right; left; exact hc
-      · right; right; right; exact hd
+      · right; right; right; exact hd --Not easy to generalize
+
+
 
 -- Voy a hacer un pretty printer para probar
 
@@ -181,6 +183,78 @@ theorem certificate {p : Nat} [Fact (Nat.Prime p)]
       (h : (Clause.cstr (.eqz (Expr.mul (Expr.var 0) (Expr.mul (Expr.var 1) (Expr.mul (Expr.mul (Expr.var 0) (Expr.var 1)) (Expr.mul (Expr.add (Expr.var 2) (Expr.const 3)) (Expr.mul (Expr.neg (Expr.var 0)) (Expr.mul (Expr.add (Expr.var 0) (Expr.var 1)) (Expr.var 2))))))))).holds ρ) :
       (Clause.or (Clause.cstr (Cstr.eqz (Expr.var 0))) (Clause.or (Clause.cstr (Cstr.eqz (Expr.var 1))) (Clause.or (Clause.cstr (Cstr.eqz (Expr.mul (Expr.var 0) (Expr.var 1)))) (Clause.or (Clause.cstr (Cstr.eqz (Expr.add (Expr.var 2) (Expr.const 3)))) (Clause.or (Clause.cstr (Cstr.eqz (Expr.neg (Expr.var 0)))) (Clause.cstr (Cstr.eqz (Expr.mul (Expr.add (Expr.var 0) (Expr.var 1)) (Expr.var 2))))))))).holds ρ := by
       simpa only [Clause.holds, Cstr.holds, Expr.eval, mul_eq_zero, or_assoc] using h
+
+
+theorem ejercicio3 {p : Nat} [Fact (Nat.Prime p)]
+    (ρ : Nat → ZMod p) :
+    ∀ (l : List (Expr p)) (hl : 2 ≤ l.length),
+      (Clause.cstr (.eqz (listToMul l (List.ne_nil_iff_length_pos.mpr (lt_trans (zero_lt_one) (hl)))))).holds ρ →
+      (listToOr l (List.ne_nil_iff_length_pos.mpr (lt_trans (zero_lt_one) (hl)))).holds ρ := by
+  intro l lne h
+  induction l using List.twoStepInduction with
+  | nil => contradiction
+  | singleton a => contradiction
+  | cons_cons a b xs ih0 ih1 =>
+      cases xs with
+      | nil =>
+          simp only [listToOr]
+          simp only [listToMul] at h
+          apply ruleEqZeroSound' _ _ h
+          simp only[ruleEqZero]
+          decide
+      | cons c cs =>
+          simp only [listToOr]
+          simp only [listToMul] at h
+          have g : Clause.holds ρ ((Clause.cstr (Cstr.eqz a)).or ((Clause.cstr (.eqz (b.mul (listToMul (c :: cs) (by simp))))))) := by
+           apply ruleEqZeroSound' _ _ h
+           simp only[ruleEqZero]
+           decide
+
+          rcases g with g1 | g2
+          left; exact g1
+          right; exact ih1 b (by simp) g2
+
+def ListExpr.meta {p : Nat} (l : List (Expr p)) : String :=
+  "[" ++ String.intercalate ", " (l.map Expr.meta) ++ "]"
+
+def certificate2 {p} (l : List (Expr p)) : String :=
+  if h : l = [] then
+    "-- Empty list, no certificate generated."
+  else
+    let mul := listToMul l h
+    let or := listToOr l h
+     let proof :=
+      if 2 ≤ l.length then
+        s!"exact ejercicio3 ρ
+          ({ListExpr.meta l} : List (Expr p))
+          (by simp) h"
+      else
+        "exact h"
+
+    s!"theorem certificate \{p : Nat} [Fact (Nat.Prime p)]
+      (ρ : Nat → ZMod p)
+      (h : (Clause.cstr (.eqz {mul.meta})).holds ρ) :
+      {or.meta}.holds ρ := by
+      {proof}"
+
+#eval IO.println (certificate2 ([
+  .var 0,
+  .var 1,
+  .mul (.var 0) (.var 1),
+  .add (.var 2) (.const 3),
+  .neg (.var 0),
+  .mul (.add (.var 0) (.var 1)) (.var 2)
+] : List (Expr 7)))
+
+
+theorem certificate' {p : Nat} [Fact (Nat.Prime p)]
+      (ρ : Nat → ZMod p)
+      (h : (Clause.cstr (.eqz (Expr.mul (Expr.var 0) (Expr.mul (Expr.var 1) (Expr.mul (Expr.mul (Expr.var 0) (Expr.var 1)) (Expr.mul (Expr.add (Expr.var 2) (Expr.const 3)) (Expr.mul (Expr.neg (Expr.var 0)) (Expr.mul (Expr.add (Expr.var 0) (Expr.var 1)) (Expr.var 2))))))))).holds ρ) :
+      (Clause.or (Clause.cstr (Cstr.eqz (Expr.var 0))) (Clause.or (Clause.cstr (Cstr.eqz (Expr.var 1))) (Clause.or (Clause.cstr (Cstr.eqz (Expr.mul (Expr.var 0) (Expr.var 1)))) (Clause.or (Clause.cstr (Cstr.eqz (Expr.add (Expr.var 2) (Expr.const 3)))) (Clause.or (Clause.cstr (Cstr.eqz (Expr.neg (Expr.var 0)))) (Clause.cstr (Cstr.eqz (Expr.mul (Expr.add (Expr.var 0) (Expr.var 1)) (Expr.var 2))))))))).holds ρ := by
+      exact ejercicio3 ρ
+          ([(Expr.var 0), (Expr.var 1), (Expr.mul (Expr.var 0) (Expr.var 1)), (Expr.add (Expr.var 2) (Expr.const 3)), (Expr.neg (Expr.var 0)), (Expr.mul (Expr.add (Expr.var 0) (Expr.var 1)) (Expr.var 2))] : List (Expr p))
+          (by simp) h
+
 
 /- De momento aparcado.
 
