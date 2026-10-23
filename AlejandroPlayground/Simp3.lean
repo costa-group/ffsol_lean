@@ -164,7 +164,7 @@ theorem ruleDistribEqZeroSoundNaive {pc : pConfig} {Γ : Ctx pc} {g c ρ} (h : �
 -- Muy sencillo para el certificado delegar sin usar rules
 theorem ejercicio4 {pc : pConfig}
     (ρ : Nat → ZMod pc.p) (a b c d : Expr pc)
-    (h : (Clause.cstr (.eqz (.mul a (.add b (.add c d))))).holds ρ) :
+    (h : (Clause.cstr (.eqz (.add (.mul a b) (.add (.mul a c) (.mul a d))))).holds ρ) :
     (Clause.or (.cstr (.eqz a)) (.cstr (.eqz (.add b (.add c d))))).holds ρ := by
 
-  simpa only [Clause.holds, Cstr.holds, Expr.eval, mul_eq_zero] using h
+  simpa only [Clause.holds, Cstr.holds, Expr.eval, mul_eq_zero, ← mul_add] using h
