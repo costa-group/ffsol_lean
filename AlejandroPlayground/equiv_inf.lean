@@ -197,3 +197,111 @@ theorem ruleEquivalenceSound {pc : pConfig} {ρ₀} (eqs : List (Cstr pc)) (g1 g
   contradiction
 
   contradiction
+
+-- CERTIFICADO
+
+def Expr.InRange {pc : pConfig} (n : Nat) : Expr pc → Prop
+  | .var i => i < n
+  | .const _ => True
+  | .add e1 e2 => e1.InRange n ∧ e2.InRange n
+  | .mul e1 e2 => e1.InRange n ∧ e2.InRange n
+  | .neg e => e.InRange n
+
+def Expr.meta {pc : pConfig} : Expr pc → String
+  | .var n => s!"(Expr.var {n})"
+  | .const c => s!"(Expr.const {c.val})"
+  | .add e₁ e₂ => s!"(Expr.add {e₁.meta} {e₂.meta})"
+  | .mul e₁ e₂ => s!"(Expr.mul {e₁.meta} {e₂.meta})"
+  | .neg e => s!"(Expr.neg {e.meta})"
+
+def Cstr.meta {pc : pConfig} : Cstr pc → String
+  | .eqz e => s!"(Cstr.eqz {e.meta})"
+  | .nez e => s!"(Cstr.nez {e.meta})"
+
+def Clause.meta {pc : pConfig} : Clause pc → String
+  | .cstr c => s!"(Clause.cstr {c.meta})"
+  | .or c₁ c₂ => s!"(Clause.or {c₁.meta} {c₂.meta})"
+
+def sustFVars {pc : pConfig} (f : Expr pc) (xs : List Nat) : Expr pc :=
+  let n := xs.length
+  match f with
+  | .var i => if h : i < n then .var (xs[i]) else f
+  | .const _ => f
+  | .add e1 e2 => .add (sustFVars e1 xs) (sustFVars e2 xs)
+  | .mul e1 e2 => .mul (sustFVars e1 xs) (sustFVars e2 xs)
+  | .neg e => .neg (sustFVars e xs)
+
+def certificate {pc : pConfig}
+    (xs xs' : List Nat)
+    (y y' : Nat)
+    (f : Expr pc)
+    (_ : xs.length = xs'.length)
+    (_ : f.InRange xs.length) : String :=
+    -- Muy Importante: f es una expresión que representa al polinomio f.
+    -- La idea es que las variables de f van de 0 a n-1, siendo n la longitud
+    -- de xs y xs'. Supongo que f(xi) se obtiene sustituyendo la variable
+    -- .var i por .var xs[i], y f(xi') se obtiene sustituyendo la variable
+    --.var i por .var xs'[i]. De moemnto esas condiciones van como premisas,
+    -- pero es provisional como todo.
+
+    -- Primer paso, construir la lista de ecuaciones xi = xi' para cada i
+    let eqs : List (Cstr pc) := List.zipWith (fun x x' => Cstr.eq (.var x) (.var x')) xs xs'
+    -- Ahora el string
+    let eqsStr := "[" ++ String.intercalate ", " (eqs.map Cstr.meta) ++ "]"
+
+    -- Segundo paso, y = f(xi), y' = f(xi')
+    let f_xs := sustFVars f xs
+    let f_xs' := sustFVars f xs'
+    let fStr := Cstr.meta (Cstr.eq (.var y) f_xs)
+    let fStr' := Cstr.meta (Cstr.eq (.var y') f_xs')
+
+    -- Tercer paso, la conclusión y = y'
+    let concl : Cstr pc := Cstr.eq (.var y) (.var y')
+    let conclStr := Cstr.meta concl
+
+    -- Finalmente, concatenar todo
+    String.intercalate "\n" [
+      "theorem equivalence_certificate {pc : pConfig}",
+      "    (ρ₀ : Nat → ZMod pc.p)",
+      s!"    (heqs : ∀ e ∈ ({eqsStr} : List (Cstr pc)), e.holds ρ₀)",
+      s!"    (hg1 : ({fStr} : Cstr pc).holds ρ₀)",
+      s!"    (hg2 : ({fStr'} : Cstr pc).holds ρ₀) :",
+      s!"    ({conclStr} : Cstr pc).holds ρ₀ := by",
+      "  exact ruleEquivalenceSound",
+      s!"    ({eqsStr} : List (Cstr pc))",
+      s!"    ({fStr} : Cstr pc)",
+      s!"    ({fStr'} : Cstr pc)",
+      s!"    ({conclStr} : Cstr pc)",
+      "    heqs hg1 hg2 (by rfl)" -- Habrá que estar seguros que rfl siempre puede.
+    ]
+    -- Por ultimo, puede haber problemas si xs tiene duplicados, de momento paso.
+
+-- Ejemplo de certificado
+
+#eval do
+  let pc : pConfig := ⟨7, by decide⟩
+
+  let f : Expr pc := .mul (.var 0) (.var 1)
+
+  IO.println <| certificate
+    [0, 1]    -- xs
+    [2, 3]    -- xs'
+    4 5       -- y, y'
+    f
+    (by decide)
+    (by simp [f, Expr.InRange])
+
+theorem equivalence_certificate {pc : pConfig}
+    (ρ₀ : Nat → ZMod pc.p)
+    (heqs : ∀ e ∈ ([(Cstr.eqz (Expr.add (Expr.var 0) (Expr.neg (Expr.var 2)))), (Cstr.eqz (Expr.add (Expr.var 1) (Expr.neg (Expr.var 3))))] : List (Cstr pc)), e.holds ρ₀)
+    (hg1 : ((Cstr.eqz (Expr.add (Expr.var 4) (Expr.neg (Expr.mul (Expr.var 0) (Expr.var 1))))) : Cstr pc).holds ρ₀)
+    (hg2 : ((Cstr.eqz (Expr.add (Expr.var 5) (Expr.neg (Expr.mul (Expr.var 2) (Expr.var 3))))) : Cstr pc).holds ρ₀) :
+    ((Cstr.eqz (Expr.add (Expr.var 4) (Expr.neg (Expr.var 5)))) : Cstr pc).holds ρ₀ := by
+  exact ruleEquivalenceSound
+    ([(Cstr.eqz (Expr.add (Expr.var 0) (Expr.neg (Expr.var 2)))), (Cstr.eqz (Expr.add (Expr.var 1) (Expr.neg (Expr.var 3))))] : List (Cstr pc))
+    ((Cstr.eqz (Expr.add (Expr.var 4) (Expr.neg (Expr.mul (Expr.var 0) (Expr.var 1))))) : Cstr pc)
+    ((Cstr.eqz (Expr.add (Expr.var 5) (Expr.neg (Expr.mul (Expr.var 2) (Expr.var 3))))) : Cstr pc)
+    ((Cstr.eqz (Expr.add (Expr.var 4) (Expr.neg (Expr.var 5)))) : Cstr pc)
+    heqs hg1 hg2 (by rfl)
+
+-- Aceptado
