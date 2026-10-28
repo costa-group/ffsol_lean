@@ -224,3 +224,214 @@ theorem ruleMonomialZeroSound {pc : pConfig}
     rw [hb]
     exact h1
   · contradiction
+
+private def lookupValue {pc : pConfig}
+    (x : Nat) : List (Cstr pc) → Option (ZMod pc.p)
+  | [] => none
+  | .eq (.var y) (.const a) :: eqs =>
+      if x = y then some a else lookupValue x eqs
+  | _ :: eqs => lookupValue x eqs
+
+private def evalMonomial {pc : pConfig}
+    (eqs : List (Cstr pc)) : Expr pc → Option (ZMod pc.p)
+  | .var x => lookupValue x eqs
+  | .const a => some a
+  | .mul e1 e2 => do
+      let a ← evalMonomial eqs e1
+      let b ← evalMonomial eqs e2
+      return a * b
+  | .neg e => do
+      let a ← evalMonomial eqs e
+      return -a
+  | .add _ _ => none
+
+def ruleMonomialValue {pc : pConfig}
+    (d : Cstr pc)
+    (eqs : List (Cstr pc))
+    (c : Cstr pc) : Bool :=
+  match d, c with
+  | .eq (.var v) m, .eq (.var w) (.const b) =>
+      decide (v = w) &&
+      isMonomial m &&
+      match evalMonomial eqs m with
+      | some a => decide (a = b)
+      | none => false
+  | _, _ => false
+
+theorem lookupValueSound {pc : pConfig}
+    (x : Nat) (eqs : List (Cstr pc))
+    (a : ZMod pc.p)
+    (h : lookupValue x eqs = some a) :
+    Cstr.eq (.var x) (.const a) ∈ eqs := by
+  induction eqs with
+  | nil => simp only [lookupValue] at h; contradiction
+  | cons y ys ih =>
+    unfold lookupValue at h
+    split at h
+    · contradiction
+    · split at h
+      · simp at h --look for explicit thm
+        rename_i heq h'
+        rw[heq, h', h]
+        exact List.mem_cons_self
+      · apply List.mem_cons.mpr
+        right
+        apply ih
+        rename_i eqs' h' heq
+        rw [← h]
+        have h'' : ys = eqs' := congrArg List.tail h'
+        rw[h'']
+    · rename_i x'' head eqs x' heq
+      apply List.mem_cons.mpr
+      right
+      apply ih
+      have h'' : ys = eqs := congrArg List.tail heq
+      rwa[h'']
+
+theorem evalMonomialSound {pc : pConfig}
+  (eqs : List (Cstr pc))
+  (m : Expr pc)
+  (mv : ZMod pc.p)
+  (h : evalMonomial eqs m = some mv)
+  (ρ : Nat → ZMod pc.p)
+  (heqs : ∀ e ∈ eqs, e.holds ρ) :
+  (Cstr.eq m (.const mv)).holds ρ := by
+  induction m generalizing mv with
+  | var n =>
+    simp only [evalMonomial] at h
+    have g := lookupValueSound n eqs mv h
+    apply heqs at g
+    assumption
+  | const c =>
+    simp only [evalMonomial] at h
+    injection h with h'
+    rw[h']
+    simp only [Cstr.holds, Expr.eval]
+    apply add_neg_eq_zero.mpr
+    rfl
+  | add e1 e2 ih1 ih2 =>
+    simp only [evalMonomial] at h
+    contradiction
+  | neg e ih =>
+    simp only[Cstr.holds, Expr.eval] at ⊢ ih
+    cases hv : evalMonomial eqs e with
+    | none =>
+      simp [evalMonomial, hv] at h
+    | some mv' =>
+      simp [evalMonomial, hv] at h
+      subst mv
+      have g := ih mv' hv
+      apply add_neg_eq_zero.mpr
+      apply add_neg_eq_zero.mp at g
+      subst mv'
+      rfl
+  | mul e1 e2 ih1 ih2 =>
+    simp only [Cstr.holds, Expr.eval] at ⊢ ih1 ih2
+    cases hv1 : evalMonomial eqs e1 with
+    | none =>
+        simp [evalMonomial, hv1] at h
+    | some mv1 =>
+        cases hv2 : evalMonomial eqs e2 with
+        | none =>
+            simp [evalMonomial, hv1, hv2] at h
+        | some mv2 =>
+            simp [evalMonomial, hv1, hv2] at h
+            subst mv
+            have g1 := ih1 mv1 hv1
+            have g2 := ih2 mv2 hv2
+            apply add_neg_eq_zero.mp at g1
+            apply add_neg_eq_zero.mp at g2
+            apply add_neg_eq_zero.mpr
+            rw [g1, g2]
+
+
+theorem ruleMonomialValueSound {pc : pConfig}
+    (d : Cstr pc)
+    (eqs : List (Cstr pc))
+    (c : Cstr pc)
+    (ρ : Nat → ZMod pc.p)
+    (h : ruleMonomialValue d eqs c = true)
+    (hd : d.holds ρ)
+    (heqs : ∀ e ∈ eqs, e.holds ρ) :
+    c.holds ρ := by
+  simp only [ruleMonomialValue] at h
+  split at h
+  · simp only [Bool.and_eq_true, decide_eq_true_eq] at h
+    rcases h with ⟨ ⟨ h', h''⟩ , h'''⟩
+    rename_i d c v m w b
+    split at h'''
+    · rename_i x a heq
+      simp only[decide_eq_true_eq] at h'''
+      subst b w
+      have g := evalMonomialSound _ _ _ heq
+      simp only [Cstr.holds, Expr.eval] at ⊢ hd
+      apply add_neg_eq_zero.mp at hd
+      have g' := g ρ heqs
+      simp only [Cstr.holds, Expr.eval] at g'
+      rwa [← hd] at g'
+    · contradiction
+  · contradiction
+
+
+  /-
+  unfold ruleMonomialValue at h
+  split at h
+  · simp only [Bool.and_eq_true, decide_eq_true_eq] at h
+    rcases h with ⟨ ⟨ h', h''⟩ , h'''⟩
+    rename_i d c v m w b
+    split at h'''
+    · rename_i a heq
+      simp only [decide_eq_true_eq] at h'''
+      induction m generalizing a b w v with
+      | var n =>
+        unfold evalMonomial at heq
+        have g := lookupValueSound _ _ _ heq
+        apply heqs at g
+        simp_all only [Cstr.holds, Expr.eval]
+        apply add_neg_eq_zero.mp at hd
+        rwa[hd]
+      | const c =>
+        unfold evalMonomial at heq
+        injection heq with heq'
+        rwa[← h', ← h''', ← heq']
+      | add e1 e2 ih1 ih2 =>
+        unfold isMonomial at h''
+        contradiction
+      | neg e ih =>
+        unfold isMonomial at h''
+        unfold evalMonomial at heq
+        cases hv : evalMonomial eqs e with
+        | none =>
+            simp only [hv] at heq
+            contradiction
+        | some v' =>
+            simp[hv] at heq
+            simp_all only [Cstr.holds, Expr.eval]
+
+  -/
+
+  /-
+  unfold ruleMonomialValue at h
+  split at h
+  · simp only [Bool.and_eq_true, decide_eq_true_eq] at h
+    rcases h with ⟨ ⟨ h', h''⟩ , h'''⟩
+    rename_i d c v m w b
+    split at h'''
+    · rename_i heq
+      unfold evalMonomial at heq
+      split at heq
+      · have g := lookupValueSound _ eqs _ heq
+        apply heqs at g
+        simp_all only [Cstr.holds, Expr.eval]
+        apply add_neg_eq_zero.mp at hd
+        simp only [decide_eq_true_eq] at h'''
+        rwa[← h''', hd]
+      · simp only [decide_eq_true_eq] at h'''
+        injection heq with heq'
+        rwa[← h', ← h''', ← heq']
+      · simp only [decide_eq_true_eq] at h'''
+
+      ·
+      · contradiction
+  · contradiction
+  -/
