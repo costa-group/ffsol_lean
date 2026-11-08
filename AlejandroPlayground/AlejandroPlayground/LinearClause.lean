@@ -14,6 +14,10 @@ This file checks deductions from §3.5 of the
 /--
 Checks the first deduction of §3.5 on an explicit binary product. The conclusion must list the
 two factors as zero equalities in the same order.
+
+**Rule.** `e1 * e2 = 0 ⇒ e1 = 0 ∨ e2 = 0`.
+
+**Example.** From `x₀ * (x₁ - 1) = 0`, infer `x₀ = 0 ∨ x₁ - 1 = 0`.
 -/
 def ruleEqZero {pc : pConfig} (g c : Clause pc) : Bool :=
   match g, c with
@@ -128,6 +132,12 @@ def listToOr {pc : pConfig} : (l : List (Expr pc)) → l ≠ [] → Clause pc
 /--
 Renders the product premise, factor disjunction, and supplied proof body as a Lean theorem. For
 an empty list it returns a comment.
+
+**Input.** `l` is the ordered factor list. `proof` is Lean tactic source to place after `by`.
+
+**Output.** For nonempty `l`, the returned string declares a theorem with the product-zero
+premise named `h` and the disjunction of the factors' zero equalities as its conclusion.
+Lean checks the supplied proof when the generated declaration is elaborated.
 -/
 private def certificateWithProof {pc : pConfig} (l : List (Expr pc)) (proof : String) : String :=
   if h : l = [] then
@@ -144,6 +154,32 @@ private def certificateWithProof {pc : pConfig} (l : List (Expr pc)) (proof : St
 /--
 Generates a product certificate whose proof unfolds the expression semantics and simplifies with
 Mathlib's zero-product lemma.
+
+**Input.** `l` is the list of factors, in the order used for both the product and the
+disjunction. The generator builds both trees by associating to the right.
+
+**Output.** A string containing a theorem named `certificate`. It takes a valuation and the
+hypothesis that the product is zero, and proves that one of the factors is zero. For an empty
+list, the output is the comment `-- Empty list, no certificate generated.`.
+
+**Example.** Print the certificate for factors `x₀` and `x₁`.
+
+```lean
+#eval IO.println (certificate1
+  ([.var 0, .var 1] : List (Expr ⟨7, by decide⟩)))
+```
+
+The generated theorem states `x₀ * x₁ = 0 ⇒ x₀ = 0 ∨ x₁ = 0` for any `pc`. The output
+below is line-wrapped for readability.
+
+```lean
+theorem certificate {pc : pConfig}
+      (ρ : Nat → ZMod pc.p)
+      (h : (Clause.cstr (.eqz (Expr.mul (Expr.var 0) (Expr.var 1)))).holds ρ) :
+      (Clause.or (Clause.cstr (Cstr.eqz (Expr.var 0)))
+        (Clause.cstr (Cstr.eqz (Expr.var 1)))).holds ρ := by
+      simpa only [Clause.holds, Cstr.holds, Expr.eval, mul_eq_zero, or_assoc] using h
+```
 -/
 def certificate1 {pc : pConfig} (l : List (Expr pc)) : String :=
   certificateWithProof l
@@ -225,6 +261,21 @@ def ListExpr.meta {pc : pConfig} (l : List (Expr pc)) : String :=
 /--
 Generates a product certificate that invokes `ejercicio3` for two or more factors. For a
 singleton, the premise already has the form of the conclusion.
+
+**Input.** `l` is the same ordered list of factors as in `certificate1`.
+
+**Output.** The generated theorem has the same name, product-zero hypothesis, and disjunction
+as in `certificate1`. An empty list gives the same comment. A singleton list gives the proof
+body `exact h`.
+
+**Example.** For `[.var 0, .var 1] : List (Expr ⟨7, by decide⟩)`, the generated statement
+is `x₀ * x₁ = 0 ⇒ x₀ = 0 ∨ x₁ = 0`. The generator emits this proof body.
+
+```lean
+exact ejercicio3 ρ
+    ([(Expr.var 0), (Expr.var 1)] : List (Expr pc))
+    (by simp) h
+```
 -/
 def certificate2 {pc : pConfig} (l : List (Expr pc)) : String :=
   let proof :=
@@ -260,6 +311,11 @@ theorem certificate' {pc : pConfig}
 /--
 Checks the factoring step from `a * b + a * c = 0` to `a * (b + c) = 0` by comparing the common
 factor and both summands syntactically.
+
+**Rule.** `a * b + a * c = 0 ⇒ a * (b + c) = 0`.
+
+**Example.** From `x₀ * x₁ + x₀ * 1 = 0`, infer `x₀ * (x₁ + 1) = 0`. The checker
+expects the second summand to be written as the explicit product `x₀ * 1`.
 -/
 def ruleDistrib {pc : pConfig} (g c : Clause pc) : Bool :=
   match g, c with
@@ -289,6 +345,11 @@ theorem ruleDistribSound {pc : pConfig} {Γ : Ctx pc} {g c ρ} (h : Γ.holds ρ)
 /--
 Checks the two-summand instance of the common-factor deduction in §3.5, with conclusion `a = 0 ∨
 b + c = 0`.
+
+**Rule.** `a * b + a * c = 0 ⇒ a = 0 ∨ b + c = 0`.
+
+**Example.** From `x₀ * x₁ + x₀ * 1 = 0`, infer `x₀ = 0 ∨ x₁ + 1 = 0`. This is the
+common-factor deduction in Example 6 of the paper, with `x₀` written as `x₀ * 1` in the sum.
 -/
 def ruleDistribEqZero {pc : pConfig} (g c : Clause pc) : Bool :=
   match g, c with

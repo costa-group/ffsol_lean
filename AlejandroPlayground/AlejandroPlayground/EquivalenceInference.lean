@@ -50,6 +50,13 @@ private def sustVars {pc : pConfig} (e1 e2 : Expr pc) (ρ : Nat → Nat) : Bool 
 /--
 Checks the §3.3 conclusion `y = y'` against the defining equations `g1` and `g2` and the input
 equalities `eqs`. The output variables must occur in the conclusion in the given order.
+
+**Rule.** From the equalities `xᵢ = xᵢ'` for each input, together with
+`y = f(x₁, …, xₙ)` and `y' = f(x₁', …, xₙ')`, infer `y = y'`. The checker compares
+the two expression trees after the variable renaming supplied by the input equalities.
+
+**Example.** From `x₀ = x₂`, `x₁ = x₃`, `x₄ = x₀ * x₁`, and `x₅ = x₂ * x₃`,
+infer `x₄ = x₅`.
 -/
 def ruleEquivalence {pc : pConfig} (eqs : List (Cstr pc)) (g1 g2 c : Cstr pc) : Bool :=
   match g1, g2, c with
@@ -210,6 +217,46 @@ must have equal length and cover every variable index in `f`. `f` is assumed to 
 variables in the range `[0, xs.length)`. Then, `f` is instantiated at `xs` and `xs'` to produce
 the two defining equations, by substituting the variable at position `i` with the variable indexed
 by `xs[i]` or `xs'[i]`.
+
+**Input.** `xs` and `xs'` give the two lists of input variable indices. `y` and `y'`
+are the output variable indices. The remaining inputs are the expression template `f` and
+proofs that the lists have equal length and that every index in `f` is in range.
+
+**Output.** A string containing a theorem named `equivalence_certificate`. Its hypotheses
+are the pairwise input equalities and the two output equations. Its conclusion is `y = y'`.
+The generated proof applies `ruleEquivalenceSound` and uses `rfl` to prove that the
+Boolean checker accepts the step when Lean elaborates the declaration.
+
+**Example.** With `xs = [0]`, `xs' = [1]`, `y = 2`, `y' = 3`, and `f = -x₀`,
+the generated theorem proves `x₂ = x₃` from `x₀ = x₁`, `x₂ = -x₀`, and `x₃ = -x₁`.
+
+```lean
+#eval do
+  let pc : pConfig := ⟨7, by decide⟩
+  let f : Expr pc := .neg (.var 0)
+  IO.println (EquivalenceInference.certificate [0] [1] 2 3 f
+    (by decide) (by simp [f, Expr.InRange]))
+```
+
+The output below is line-wrapped for readability.
+
+```lean
+theorem equivalence_certificate {pc : pConfig}
+    (ρ₀ : Nat → ZMod pc.p)
+    (heqs : ∀ e ∈ ([(Cstr.eqz (Expr.add (Expr.var 0) (Expr.neg (Expr.var 1))))]
+      : List (Cstr pc)), e.holds ρ₀)
+    (hg1 : ((Cstr.eqz (Expr.add (Expr.var 2) (Expr.neg (Expr.neg (Expr.var 0)))))
+      : Cstr pc).holds ρ₀)
+    (hg2 : ((Cstr.eqz (Expr.add (Expr.var 3) (Expr.neg (Expr.neg (Expr.var 1)))))
+      : Cstr pc).holds ρ₀) :
+    ((Cstr.eqz (Expr.add (Expr.var 2) (Expr.neg (Expr.var 3)))) : Cstr pc).holds ρ₀ := by
+  exact ruleEquivalenceSound
+    ([(Cstr.eqz (Expr.add (Expr.var 0) (Expr.neg (Expr.var 1))))] : List (Cstr pc))
+    ((Cstr.eqz (Expr.add (Expr.var 2) (Expr.neg (Expr.neg (Expr.var 0))))) : Cstr pc)
+    ((Cstr.eqz (Expr.add (Expr.var 3) (Expr.neg (Expr.neg (Expr.var 1))))) : Cstr pc)
+    ((Cstr.eqz (Expr.add (Expr.var 2) (Expr.neg (Expr.var 3)))) : Cstr pc)
+    heqs hg1 hg2 (by rfl)
+```
 -/
 def EquivalenceInference.certificate {pc : pConfig}
     (xs xs' : List Nat)

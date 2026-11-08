@@ -25,6 +25,11 @@ private def checkLightweightConflict {pc : pConfig}
 
 /--
 Checks either order of the two premises for a lightweight domain conflict as described in §3.2.
+
+**Rules.** `x = a ∧ x = b ⇒ False` when `a ≠ b`, and `x = a ∧ x ≠ a ⇒ False`.
+
+**Examples.** Over `ZMod 7`, the pair `x = 2`, `x = 3` yields a conflict. So does the
+pair `x ≠ 2`, `x = 2`, even with the disequation supplied first.
 -/
 def ruleLightweightConflict {pc : pConfig}
     (c1 c2 : Cstr pc) : Bool :=
@@ -75,6 +80,11 @@ theorem ruleLightweightConflictSound {pc : pConfig}
 
 /--
 Checks the §3.2 propagation from `x = a` to `x ≠ b` by testing the variable index and `a ≠ b`.
+
+**Rule.** `x = a ∧ a ≠ b ⇒ x ≠ b`.
+
+**Example.** Over `ZMod 7`, from `x = 2` infer `x ≠ 3` since `2` and `3` are
+distinct field values.
 -/
 def ruleDomainPropagation {pc : pConfig}
     (c1 c2 : Cstr pc) : Bool :=
@@ -130,6 +140,10 @@ def varAppears {pc : pConfig} (n : Nat) :  (Expr pc) → Bool
 /--
 Checks the §3.2 propagation from `v = m` and `x = 0` to `v = 0` when `m` is a recognized
 monomial containing `x`.
+
+**Rule.** `v = m ∧ x = 0 ⇒ v = 0` when `m` is a monomial containing `x`.
+
+**Example.** From `v = x * y` and `x = 0`, infer `v = 0` for any value of `y`.
 -/
 def ruleMonomialZero {pc : pConfig}
     (g1 g2 c : Cstr pc) : Bool :=
@@ -250,6 +264,12 @@ Checks the §3.2 propagation of a fixed monomial value. Given `v = m` and fixing
 `eqs`, it accepts `v = b` when the recognized monomial evaluates to `b`. Here, evaluating the
 monomial does not mean under a certain valuation, but rather using the fixed values in `eqs`.
 For example, given `v = x * y` and `x = 2`, `y = 3`, it accepts `v = 6`.
+
+**Rule.** `v = m ∧ x₁ = a₁ ∧ … ∧ xₙ = aₙ ⇒ v = m(a₁, …, aₙ)`, where the fixed
+variables cover all variables in `m` and the value on the right is computed in the field.
+
+**Example.** Over `ZMod 7`, from `v = x * y`, `x = 5`, and `y = 3`, infer `v = 1`
+because the product of `5` and `3` is `1` modulo `7`.
 -/
 def ruleMonomialValue {pc : pConfig}
     (d : Cstr pc)
