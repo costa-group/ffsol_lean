@@ -1,7 +1,19 @@
 import Mathlib
 
+/-!
+# Tactic cleanup and timing experiment
+
+`cleanup_grind` cleans the main goal before invoking `grind`. The `timed` tactic reports
+the elapsed time of its argument in milliseconds. The example exercises these tactics
+with many unrelated equalities in scope. This is a proof-engineering experiment outside
+the FFSOL rule checker and the library build.
+-/
+
 open Lean Meta Elab Tactic
 
+/--
+Replaces the main goal with its cleaned form and runs `grind` on it.
+-/
 def runCleanupGrind : TacticM Unit := do
   let goal ← getMainGoal
   let cleanGoal ← goal.cleanup

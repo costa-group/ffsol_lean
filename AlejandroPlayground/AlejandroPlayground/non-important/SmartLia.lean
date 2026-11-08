@@ -1,7 +1,19 @@
 import Mathlib
 
+/-!
+# Linear arithmetic context inspection experiment
+
+The `smart_lia` tactic logs the visible declarations and the goal, distinguishing
+propositional hypotheses from other declarations. The example closes the goal with a
+separate call to `linarith`. This file is outside the FFSOL rule checker and the
+library build.
+-/
+
 open Lean Meta Elab Tactic
 
+/--
+Collects the free variable identifiers of a Lean metaprogramming expression.
+-/
 def getFVars (e : Expr) : Array FVarId :=
   (Lean.collectFVars {} e).fvarIds
 
