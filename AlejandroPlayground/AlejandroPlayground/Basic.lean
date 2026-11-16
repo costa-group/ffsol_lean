@@ -20,9 +20,14 @@ structure pConfig where
   The proof that the modulus is prime.
   -/
   p_prime : p.Prime
+  midpoint : ℕ := p / 2 + 1 -- the midpoint of the field, used for signed representation
+  midpoint_ok : midpoint = p / 2 + 1 := by rfl -- ensure midpoint is correctly defined
 
 /--
 Register that c.p is a prime number.
 Makes the primality proof available to Mathlib's instances for prime residue fields.
 -/
 instance (c : pConfig) : Fact c.p.Prime := ⟨c.p_prime⟩
+
+/- Register that c.p is not zero, it is useful for some proofs  -/
+instance (c : pConfig) : NeZero c.p := ⟨c.p_prime.ne_zero⟩

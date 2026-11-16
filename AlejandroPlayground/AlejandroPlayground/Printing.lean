@@ -28,6 +28,7 @@ Renders a theory literal as an equation or disequation against zero.
 def Cstr.print {pc : pConfig} : Cstr pc → String
   | .eqz e => s!"{e.print} = 0"
   | .nez e => s!"{e.print} ≠ 0"
+  | .range e l u => s!"{l} ≤ {e.print} ≤ {u}"
 
 /--
 Renders the literals of a clause as a disjunction in their original order.
@@ -53,6 +54,7 @@ Emits a Lean term using `Cstr.eqz` or `Cstr.nez` and the rendered expression.
 def Cstr.meta {pc : pConfig} : Cstr pc → String
   | .eqz e => s!"(Cstr.eqz {e.meta})"
   | .nez e => s!"(Cstr.nez {e.meta})"
+  | .range e l u => s!"(Cstr.range {e.meta} {l} {u})"
 
 /--
 Emits Lean constructor syntax for a clause, preserving its binary disjunction tree.

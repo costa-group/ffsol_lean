@@ -197,7 +197,7 @@ private def certificateExample (pc : pConfig) : List (Expr pc) := [
   .mul (.add (.var 0) (.var 1)) (.var 2)
 ]
 
-#eval IO.println (certificate1 (certificateExample ⟨7, by decide⟩))
+#eval IO.println (certificate1 (certificateExample ⟨7, by decide, 4, by rfl⟩))
 
 /--
 A concrete product certificate proved by direct simplification, as in `certificate1`.
@@ -287,7 +287,7 @@ def certificate2 {pc : pConfig} (l : List (Expr pc)) : String :=
       "exact h"
   certificateWithProof l proof
 
-#eval IO.println (certificate2 (certificateExample ⟨7, by decide⟩))
+#eval IO.println (certificate2 (certificateExample ⟨7, by decide, 4, by rfl⟩))
 
 
 /--

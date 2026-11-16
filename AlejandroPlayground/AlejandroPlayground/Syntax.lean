@@ -26,6 +26,7 @@ An equation or disequation against zero, representing a theory literal in FFSOL.
 inductive Cstr (pc : pConfig) where
   | eqz : Expr pc → Cstr pc
   | nez : Expr pc → Cstr pc
+  | range : Expr pc → ℤ → ℤ → Cstr pc
   deriving DecidableEq
 
 /--

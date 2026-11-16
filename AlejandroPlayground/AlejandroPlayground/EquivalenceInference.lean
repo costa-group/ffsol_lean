@@ -302,7 +302,7 @@ def EquivalenceInference.certificate {pc : pConfig}
 -- Ejemplo de certificado
 
 #eval do
-  let pc : pConfig := ⟨7, by decide⟩
+  let pc : pConfig := ⟨7, by decide, 4, by rfl⟩
   let f : Expr pc := .mul (.var 0) (.var 1)
   IO.println <| EquivalenceInference.certificate
     [0, 1]    -- xs
